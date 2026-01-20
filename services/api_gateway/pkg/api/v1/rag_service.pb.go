@@ -25,6 +25,7 @@ type ChatRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	History       []*MessageHistory      `protobuf:"bytes,2,rep,name=history,proto3" json:"history,omitempty"`
+	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // Optional: existing session ID
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -71,6 +72,13 @@ func (x *ChatRequest) GetHistory() []*MessageHistory {
 		return x.History
 	}
 	return nil
+}
+
+func (x *ChatRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
 }
 
 type MessageHistory struct {
@@ -129,6 +137,7 @@ type ChatResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Answer        string                 `protobuf:"bytes,1,opt,name=answer,proto3" json:"answer,omitempty"`
 	Sources       []*Source              `protobuf:"bytes,2,rep,name=sources,proto3" json:"sources,omitempty"`
+	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // Session ID for this conversation
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -175,6 +184,13 @@ func (x *ChatResponse) GetSources() []*Source {
 		return x.Sources
 	}
 	return nil
+}
+
+func (x *ChatResponse) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
 }
 
 type Source struct {
@@ -241,17 +257,21 @@ var File_rag_service_proto protoreflect.FileDescriptor
 
 const file_rag_service_proto_rawDesc = "" +
 	"\n" +
-	"\x11rag_service.proto\x12\x02v1\"U\n" +
+	"\x11rag_service.proto\x12\x02v1\"t\n" +
 	"\vChatRequest\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12,\n" +
-	"\ahistory\x18\x02 \x03(\v2\x12.v1.MessageHistoryR\ahistory\">\n" +
+	"\ahistory\x18\x02 \x03(\v2\x12.v1.MessageHistoryR\ahistory\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\">\n" +
 	"\x0eMessageHistory\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\tR\acontent\"L\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"k\n" +
 	"\fChatResponse\x12\x16\n" +
 	"\x06answer\x18\x01 \x01(\tR\x06answer\x12$\n" +
 	"\asources\x18\x02 \x03(\v2\n" +
-	".v1.SourceR\asources\"M\n" +
+	".v1.SourceR\asources\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\"M\n" +
 	"\x06Source\x12\x19\n" +
 	"\bdoc_name\x18\x01 \x01(\tR\adocName\x12\x12\n" +
 	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x14\n" +

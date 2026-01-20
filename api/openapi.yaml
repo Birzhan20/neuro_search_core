@@ -99,6 +99,10 @@ components:
           type: string
           example: "Как оформить командировку?"
           description: Вопрос пользователя
+        session_id:
+          type: string
+          format: uuid
+          description: ID сессии для продолжения диалога (опционально)
         history:
           type: array
           description: История последних сообщений (для контекста диалога)
@@ -117,6 +121,10 @@ components:
         answer:
           type: string
           description: Сгенерированный ответ
+        session_id:
+          type: string
+          format: uuid
+          description: ID сессии для продолжения диалога
         sources:
           type: array
           description: Список документов, использованных для ответа

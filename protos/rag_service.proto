@@ -11,6 +11,7 @@ service RagService {
 message ChatRequest {
   string message = 1;
   repeated MessageHistory history = 2;
+  string session_id = 3;  // Optional: existing session ID
 }
 
 message MessageHistory {
@@ -21,6 +22,7 @@ message MessageHistory {
 message ChatResponse {
   string answer = 1;
   repeated Source sources = 2;
+  string session_id = 3;  // Session ID for this conversation
 }
 
 message Source {
