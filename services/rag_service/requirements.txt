@@ -11,3 +11,4 @@ langchain-text-splitters
 pypdf>=3.17.4
 sentence-transformers>=2.3.0
 python-dotenv
+python-docx

@@ -34,7 +34,7 @@ paths:
   /ingest:
     post:
       summary: Загрузка документа
-      description: Принимает файл (PDF/DOCX), парсит его и отправляет в очередь на индексацию.
+      description: Принимает файлы (PDF/DOCX/TXT), парсит их и отправляет в очередь на индексацию.
       tags:
         - Ingestion
       requestBody:

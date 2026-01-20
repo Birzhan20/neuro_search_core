@@ -12,7 +12,8 @@ import grpc
 from aio_pika import connect_robust
 from aio_pika.abc import AbstractIncomingMessage
 from dotenv import load_dotenv
-from langchain_community.document_loaders import PyPDFLoader
+import docx
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_community.vectorstores import Qdrant
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -71,6 +72,25 @@ async def init_qdrant_collection() -> None:
         await client.close()
 
 
+def load_document(file_path: str) -> list[Any]:
+    """Load document based on file extension."""
+    ext = os.path.splitext(file_path)[1].lower()
+
+    if ext == ".pdf":
+        loader = PyPDFLoader(file_path)
+        return loader.load()
+    elif ext == ".docx":
+        doc = docx.Document(file_path)
+        text = "\n".join([para.text for para in doc.paragraphs])
+        from langchain_core.documents import Document
+        return [Document(page_content=text, metadata={"source": file_path})]
+    elif ext == ".txt":
+        loader = TextLoader(file_path, encoding="utf-8")
+        return loader.load()
+    else:
+        raise ValueError(f"Unsupported file format: {ext}")
+
+
 async def process_file_task(message: AbstractIncomingMessage) -> None:
     """Process incoming file task from RabbitMQ."""
     async with message.process():
@@ -85,11 +105,15 @@ async def process_file_task(message: AbstractIncomingMessage) -> None:
                 logger.error("File not found: %s", file_path)
                 return
 
+            ext = os.path.splitext(file_path)[1].lower()
+            if ext not in (".pdf", ".docx", ".txt"):
+                logger.error("Unsupported file format: %s", ext)
+                return
+
             loop = asyncio.get_running_loop()
 
             def processing_logic() -> list[Any]:
-                loader = PyPDFLoader(file_path)
-                pages = loader.load()
+                pages = load_document(file_path)
                 text_splitter = RecursiveCharacterTextSplitter(
                     chunk_size=1000,
                     chunk_overlap=200,

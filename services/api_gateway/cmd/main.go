@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -76,6 +77,14 @@ func main() {
 	r := gin.Default()
 	r.MaxMultipartMemory = 8 << 20
 
+	// Health check endpoint
+	r.GET("/api/v1/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "healthy",
+			"version": "1.0.0",
+		})
+	})
+
 	r.POST("/api/v1/chat", func(c *gin.Context) {
 		var req struct {
 			Message string `json:"message"`
@@ -118,6 +127,13 @@ func main() {
 		}
 
 		for _, file := range files {
+			// Validate file extension
+			ext := strings.ToLower(filepath.Ext(file.Filename))
+			if ext != ".pdf" && ext != ".docx" && ext != ".txt" {
+				log.Printf("Unsupported file format: %s", ext)
+				continue
+			}
+
 			filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
 			dst := filepath.Join(uploadPath, filename)
 
