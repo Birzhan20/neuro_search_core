@@ -13,3 +13,4 @@ python-dotenv
 python-docx
 sqlalchemy[asyncio]>=2.0.0
 asyncpg>=0.29.0
+prometheus-client>=0.20.0

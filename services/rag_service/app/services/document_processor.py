@@ -1,7 +1,6 @@
 """Document processing service."""
 import asyncio
 import os
-from typing import Any
 
 import docx
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
@@ -10,6 +9,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.core.config import settings
+from app.core.metrics import DOCUMENT_PROCESSED
 from app.infrastructure.qdrant import qdrant_service
 from app.services.embeddings import embeddings_service
 
@@ -54,10 +54,12 @@ def upload_to_qdrant(chunks: list[Document]) -> None:
 async def process_document(file_path: str) -> None:
     """Process document: load, split, embed, and store."""
     if not os.path.exists(file_path):
+        DOCUMENT_PROCESSED.labels(status="not_found").inc()
         raise FileNotFoundError(f"File not found: {file_path}")
 
     ext = os.path.splitext(file_path)[1].lower()
     if ext not in SUPPORTED_EXTENSIONS:
+        DOCUMENT_PROCESSED.labels(status="unsupported").inc()
         raise ValueError(f"Unsupported format: {ext}")
 
     loop = asyncio.get_running_loop()
@@ -67,4 +69,10 @@ async def process_document(file_path: str) -> None:
         chunks = split_documents(documents)
         upload_to_qdrant(chunks)
 
-    await loop.run_in_executor(None, process)
+    try:
+        await loop.run_in_executor(None, process)
+        DOCUMENT_PROCESSED.labels(status="success").inc()
+    except Exception:
+        DOCUMENT_PROCESSED.labels(status="error").inc()
+        raise
+

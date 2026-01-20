@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"neuro_search/gateway/internal/grpc_client"
+	"neuro_search/gateway/internal/metrics"
 	"neuro_search/gateway/internal/rabbitmq"
 
 	"github.com/gin-gonic/gin"
@@ -49,8 +50,11 @@ type ChatRequest struct {
 
 // Chat handles chat requests.
 func (h *Handler) Chat(c *gin.Context) {
+	start := time.Now()
+
 	var req ChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		metrics.RequestCount.WithLabelValues("chat", "bad_request").Inc()
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
@@ -61,9 +65,13 @@ func (h *Handler) Chat(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("RAG service error: %v", err)
+		metrics.RequestCount.WithLabelValues("chat", "error").Inc()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "RAG Service unavailable"})
 		return
 	}
+
+	metrics.RequestCount.WithLabelValues("chat", "success").Inc()
+	metrics.RequestLatency.WithLabelValues("chat").Observe(time.Since(start).Seconds())
 
 	c.JSON(http.StatusOK, gin.H{
 		"answer":     resp.Answer,
@@ -80,19 +88,24 @@ var allowedExtensions = map[string]bool{
 
 // Ingest handles file upload for processing.
 func (h *Handler) Ingest(c *gin.Context) {
+	start := time.Now()
+
 	form, err := c.MultipartForm()
 	if err != nil {
+		metrics.RequestCount.WithLabelValues("ingest", "bad_request").Inc()
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data"})
 		return
 	}
 
 	files := form.File["files"]
 	if len(files) == 0 {
+		metrics.RequestCount.WithLabelValues("ingest", "bad_request").Inc()
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No files provided"})
 		return
 	}
 
 	if err := os.MkdirAll(h.uploadPath, os.ModePerm); err != nil {
+		metrics.RequestCount.WithLabelValues("ingest", "error").Inc()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
 		return
 	}
@@ -103,6 +116,7 @@ func (h *Handler) Ingest(c *gin.Context) {
 		ext := strings.ToLower(filepath.Ext(file.Filename))
 		if !allowedExtensions[ext] {
 			log.Printf("Unsupported file format: %s", ext)
+			metrics.FilesUploaded.WithLabelValues("unsupported").Inc()
 			continue
 		}
 
@@ -111,6 +125,7 @@ func (h *Handler) Ingest(c *gin.Context) {
 
 		if err := c.SaveUploadedFile(file, dst); err != nil {
 			log.Printf("Failed to save file: %v", err)
+			metrics.FilesUploaded.WithLabelValues("save_error").Inc()
 			continue
 		}
 
@@ -121,11 +136,16 @@ func (h *Handler) Ingest(c *gin.Context) {
 		})
 		if err != nil {
 			log.Printf("Failed to publish task: %v", err)
+			metrics.FilesUploaded.WithLabelValues("publish_error").Inc()
 			continue
 		}
 
+		metrics.FilesUploaded.WithLabelValues("success").Inc()
 		taskIDs = append(taskIDs, taskID)
 	}
+
+	metrics.RequestCount.WithLabelValues("ingest", "success").Inc()
+	metrics.RequestLatency.WithLabelValues("ingest").Observe(time.Since(start).Seconds())
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"status":   "processing",

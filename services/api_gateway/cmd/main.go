@@ -10,6 +10,7 @@ import (
 	"neuro_search/gateway/internal/rabbitmq"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -35,6 +36,7 @@ func main() {
 	r.GET("/api/v1/health", h.Health)
 	r.POST("/api/v1/chat", h.Chat)
 	r.POST("/api/v1/ingest", h.Ingest)
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	log.Printf("Gateway running on port %s", cfg.Port)
 	r.Run(":" + cfg.Port)
