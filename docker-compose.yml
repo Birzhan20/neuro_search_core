@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: neurosearch_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api_gateway
+    networks:
+      - neurosearch_net
+
+  api_gateway:
+    build: ./services/api_gateway
+    container_name: neurosearch_go
+    ports:
+      - "8080:8080"
+    environment:
+      - RAG_SERVICE_URL=rag_service:50051
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - rabbitmq
+      - rag_service
+    networks:
+      - neurosearch_net
+    volumes:
+      - ./data/uploads:/app/uploads
+
+  rag_service:
+    build: ./services/rag_service
+    container_name: neurosearch_python
+    environment:
+      - DB_HOST=postgres
+      - QDRANT_HOST=qdrant
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - qdrant
+      - postgres
+      - rabbitmq
+    networks:
+      - neurosearch_net
+    volumes:
+      - ./data/uploads:/app/uploads
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: neurosearch_rmq
+    ports:
+      - "15672:15672" # Admin 'guest/guest'
+      - "5672:5672"
+    networks:
+      - neurosearch_net
+
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: neurosearch_qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./data/qdrant_storage:/qdrant/storage
+    networks:
+      - neurosearch_net
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: neurosearch_pg
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-neurosearch}
+    volumes:
+      - ./data/pg_data:/var/lib/postgresql/data
+    networks:
+      - neurosearch_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: neurosearch_redis
+    networks:
+      - neurosearch_net
+
+networks:
+  neurosearch_net:
+    driver: bridge

@@ -1,0 +1,133 @@
+openapi: 3.0.3
+info:
+  title: NeuroSearch Core API
+  description: >
+    API для корпоративной RAG-системы. Позволяет загружать документы 
+    для индексации и выполнять семантический поиск с генерацией ответов (LLM).
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local Dev Server
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Проверка доступности сервиса и соединения с БД.
+      tags:
+        - System
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  version:
+                    type: string
+                    example: "1.0.0"
+
+  /ingest:
+    post:
+      summary: Загрузка документа
+      description: Принимает файл (PDF/DOCX), парсит его и отправляет в очередь на индексацию.
+      tags:
+        - Ingestion
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                    description: Файл для обработки (max 10MB)
+      responses:
+        '202':
+          description: Accepted (Файл принят в обработку)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks_id:
+                    type: array
+                    items:
+                      type: string
+                      format: uuid
+                    description: ID задачи для отслеживания статуса
+                  status:
+                    type: string
+                    example: "processing"
+
+  /chat:
+    post:
+      summary: Генерация ответа (RAG)
+      description: Поиск контекста по базе знаний и генерация ответа LLM.
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: "Как оформить командировку?"
+          description: Вопрос пользователя
+        history:
+          type: array
+          description: История последних сообщений (для контекста диалога)
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [user, assistant]
+              content:
+                type: string
+
+    ChatResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+          description: Сгенерированный ответ
+        sources:
+          type: array
+          description: Список документов, использованных для ответа
+          items:
+            type: object
+            properties:
+              doc_name:
+                type: string
+              page_number:
+                type: integer
+              score:
+                type: number
+                format: float
+                description: Степень уверенности (relevance score)

@@ -1,0 +1,33 @@
+# Data & Uploads
+data/
+services/api_gateway/pkg/api/v1/*.pb.go
+services/rag_service/proto/*.py
+services/rag_service/proto/*.pyi
+services/rag_service/proto/__init__.py
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Go
+services/api_gateway/main
+vendor/
+*.out
+*.exe
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environments
+.env
+.env.local
