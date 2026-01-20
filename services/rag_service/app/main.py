@@ -1,14 +1,11 @@
 """RAG Service entry point."""
 import asyncio
 import logging
-import sys
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from pathlib import Path
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 
 import grpc
 
-sys.path.insert(0, str(Path(__file__).parent))
 
 from app.core.config import settings
 from app.core.database import db
