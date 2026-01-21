@@ -12,6 +12,8 @@ class Settings:
     RABBITMQ_URL: str = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
     QDRANT_HOST: str = os.getenv("QDRANT_HOST", "qdrant")
     QDRANT_PORT: int = int(os.getenv("QDRANT_PORT", "6333"))
+    QDRANT_GRPC_PORT: int = int(os.getenv("QDRANT_GRPC_PORT", "6334"))
+    QDRANT_PREFER_GRPC: bool = True
     QDRANT_COLLECTION: str = "documents"
 
     DB_HOST: str = os.getenv("DB_HOST", "postgres")

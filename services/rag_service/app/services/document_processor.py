@@ -8,6 +8,7 @@ import tiktoken
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_community.vectorstores import Qdrant
 from langchain_core.documents import Document
+from qdrant_client import QdrantClient
 
 from app.core.config import settings
 from app.core.metrics import DOCUMENT_PROCESSED
@@ -69,6 +70,7 @@ class TokenTextSplitter:
         return result
 
 
+# Initialize splitter with config
 text_splitter = TokenTextSplitter(
     chunk_size=settings.CHUNK_SIZE_TOKENS,
     chunk_overlap=settings.CHUNK_OVERLAP_TOKENS,
@@ -100,15 +102,24 @@ def split_documents(documents: list[Document]) -> list[Document]:
 
 
 def upload_to_qdrant(chunks: list[Document]) -> None:
-    """Upload document chunks to Qdrant."""
-    logger.info(f"Uploading {len(chunks)} chunks to Qdrant")
-    Qdrant.from_documents(
-        chunks,
-        embeddings_service.model,
-        url=qdrant_service.url,
-        prefer_grpc=False,
+    """Upload document chunks to Qdrant via gRPC."""
+    logger.info(f"Uploading {len(chunks)} chunks to Qdrant (gRPC)...")
+    
+    # Initialize Sync QdrantClient for ingestion worker
+    client = QdrantClient(
+        host=settings.QDRANT_HOST,
+        port=settings.QDRANT_PORT,
+        grpc_port=settings.QDRANT_GRPC_PORT,
+        prefer_grpc=settings.QDRANT_PREFER_GRPC,
+    )
+
+    # Use Qdrant VectorStore with explicit client
+    vector_store = Qdrant(
+        client=client,
+        embeddings=embeddings_service.model,
         collection_name=settings.QDRANT_COLLECTION,
     )
+    vector_store.add_documents(chunks)
 
 
 async def process_document(file_path: str) -> None:

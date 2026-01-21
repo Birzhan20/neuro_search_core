@@ -12,11 +12,18 @@ class QdrantService:
         """Initialize Qdrant client."""
         self.host = settings.QDRANT_HOST
         self.port = settings.QDRANT_PORT
+        self.grpc_port = settings.QDRANT_GRPC_PORT
+        self.prefer_grpc = settings.QDRANT_PREFER_GRPC
         self.collection = settings.QDRANT_COLLECTION
 
     def get_client(self) -> AsyncQdrantClient:
         """Create new client instance."""
-        return AsyncQdrantClient(host=self.host, port=self.port)
+        return AsyncQdrantClient(
+            host=self.host,
+            port=self.port,
+            grpc_port=self.grpc_port,
+            prefer_grpc=self.prefer_grpc,
+        )
 
     async def init_collection(self) -> None:
         """Create collection if not exists."""
@@ -45,15 +52,17 @@ class QdrantService:
                 limit=limit,
                 with_payload=True,
             )
-            return [
-                {
-                    "source": p.payload.get("source", "unknown") if p.payload else "unknown",
-                    "page": p.payload.get("page", 0) if p.payload else 0,
-                    "content": p.payload.get("page_content", "") if p.payload else "",
+            results = []
+            for p in result.points:
+                payload = p.payload or {}
+                meta = payload.get("metadata", {})
+                results.append({
+                    "source": meta.get("source", payload.get("source", "unknown")),
+                    "page": meta.get("page", payload.get("page", 0)),
+                    "content": payload.get("page_content", ""),
                     "score": p.score or 0.0,
-                }
-                for p in result.points
-            ]
+                })
+            return results
         finally:
             await client.close()
 
