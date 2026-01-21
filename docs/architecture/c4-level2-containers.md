@@ -28,7 +28,7 @@ C4Container
     
     Rel(queue, rag_service, "Consume Task", "AMQP")
     
-    Rel(rag_service, vector_db, "Search/Upsert", "gRPC")
+    Rel(rag_service, vector_db, "ANN Search", "gRPC")
     Rel(rag_service, rel_db, "Read/Write History", "Async SQL")
     Rel(rag_service, llm, "Generate", "HTTPS")
 ```

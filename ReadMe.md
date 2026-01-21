@@ -120,6 +120,13 @@ The system exports Prometheus metrics for monitoring performance and reliability
 ### Directory Structure
 ```
 .
+├── api
+│   └──openapi.yaml      # OpenAPI specification for API Gateway (Swagger)
+├── docs
+│   ├──architecture      # System architecture overview (C4 diagrams)
+│   ├──decisions         # Design decisions and rationale (ADRs)
+│   └──product_requirement_document.md 
+│
 ├── services
 │   ├── api_gateway      # Go Service (Gin, gRPC Client)
 │   └── rag_service      # Python Service (LangChain)
