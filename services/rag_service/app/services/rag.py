@@ -1,13 +1,23 @@
-"""RAG pipeline service."""
+"""RAG pipeline service with Jinja2 templates."""
+import logging
 import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader
 
 from app.core.metrics import LLM_LATENCY, REQUEST_COUNT, REQUEST_LATENCY, VECTOR_SEARCH_LATENCY
 from app.crud import get_messages, get_or_create_session, save_message
 from app.infrastructure.qdrant import qdrant_service
 from app.services.embeddings import embeddings_service
 from app.services.llm import llm_service
+
+logger = logging.getLogger(__name__)
+
+
+TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
+jinja_env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), autoescape=False)
 
 
 @dataclass
@@ -28,12 +38,10 @@ class RAGResponse:
     session_id: str
 
 
-SYSTEM_PROMPT = """You are a corporate AI assistant.
-Answer strictly based on the provided context.
-If information is missing, say 'No information found'.
-
-Context:
-{context}"""
+def render_system_prompt(context: str) -> str:
+    """Render system prompt from Jinja2 template."""
+    template = jinja_env.get_template("system_prompt.j2")
+    return template.render(context=context)
 
 
 async def process_query(query: str, session_id: str | None = None) -> RAGResponse:
@@ -56,6 +64,7 @@ async def process_query(query: str, session_id: str | None = None) -> RAGRespons
             answer = "No relevant information found in documents."
             await save_message(sid, "assistant", answer)
             REQUEST_COUNT.labels(method="chat", status="no_results").inc()
+            logger.info(f"No results for query: {query[:50]}...")
             return RAGResponse(answer=answer, sources=[], session_id=str(sid))
 
         context_parts = []
@@ -69,7 +78,7 @@ async def process_query(query: str, session_id: str | None = None) -> RAGRespons
             ))
 
         context = "\n---\n".join(context_parts)
-        system_prompt = SYSTEM_PROMPT.format(context=context)
+        system_prompt = render_system_prompt(context)
 
         messages = llm_service.build_messages(system_prompt, history, query)
 
@@ -80,10 +89,12 @@ async def process_query(query: str, session_id: str | None = None) -> RAGRespons
         await save_message(sid, "assistant", answer)
 
         REQUEST_COUNT.labels(method="chat", status="success").inc()
+        logger.info(f"Query processed in {time.perf_counter() - start_time:.2f}s")
         return RAGResponse(answer=answer, sources=sources, session_id=str(sid))
 
-    except Exception:
+    except Exception as e:
         REQUEST_COUNT.labels(method="chat", status="error").inc()
+        logger.error(f"RAG pipeline error: {e}")
         raise
 
     finally:

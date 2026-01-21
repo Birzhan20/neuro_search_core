@@ -25,6 +25,10 @@ class Settings:
 
     GRPC_PORT: str = "[::]:50051"
 
+    CHUNK_SIZE_TOKENS: int = 256
+    CHUNK_OVERLAP_TOKENS: int = 100
+    TIKTOKEN_ENCODING: str = "cl100k_base"
+
     @property
     def database_url(self) -> str:
         """Build PostgreSQL connection string."""
