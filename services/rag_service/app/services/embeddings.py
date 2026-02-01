@@ -11,7 +11,7 @@ class EmbeddingsService:
 
     def __init__(self) -> None:
         """Initialize embeddings model."""
-        self.model = HuggingFaceEmbeddings(model_name=settings.EMBEDDINGS_MODEL)
+        self.model = HuggingFaceEmbeddings(model=settings.EMBEDDINGS_MODEL)
 
     async def embed_query(self, text: str) -> list[float]:
         """Get embedding vector for query text."""

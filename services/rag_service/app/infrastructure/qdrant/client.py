@@ -39,10 +39,22 @@ class QdrantService:
                         distance=models.Distance.COSINE,
                     ),
                 )
+
+                await client.create_payload_index(
+                    collection_name=self.collection,
+                    field_name="content",
+                    field_schema=models.TextIndexParams(
+                        type="text",
+                        tokenizer=models.TokenizerType.MULTILINGUAL,
+                        min_token_len=2,
+                        max_token_len=20,
+                        lowercase=True,
+                    ), # index for text search
+                )
         finally:
             await client.close()
 
-    async def search(self, query_vector: list[float], limit: int = 3) -> list[dict]:
+    async def search(self, query_vector: list[float], limit: int = 10) -> list[dict]:
         """Search similar documents."""
         client = self.get_client()
         try:
@@ -57,6 +69,7 @@ class QdrantService:
                 payload = p.payload or {}
                 meta = payload.get("metadata", {})
                 results.append({
+                    "id": p.id,
                     "source": meta.get("source", payload.get("source", "unknown")),
                     "page": meta.get("page", payload.get("page", 0)),
                     "content": payload.get("page_content", ""),
@@ -65,6 +78,39 @@ class QdrantService:
             return results
         finally:
             await client.close()
+
+    async def search_bm25(self, query: str, limit: int) -> list[dict]:
+        """Search documents using BM25 text search."""
+        client = self.get_client()
+        try:
+            result, _ = await client.scroll(
+                collection_name=self.collection,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="content",
+                            match=models.MatchText(text=query)
+                        )
+                    ]
+                ),
+                limit=limit,
+                with_payload=True,
+            )
+            results = []
+            for p in result:
+                payload = p.payload or {}
+                meta = payload.get("metadata", {})
+                results.append({
+                    "id": p.id,
+                    "source": meta.get("source", payload.get("source", "unknown")),
+                    "page": meta.get("page", payload.get("page", 0)),
+                    "content": payload.get("page_content", ""),
+                    "score": 0.0,  # Scroll doesn't return score
+                })
+            return results
+        finally:
+            await client.close()
+
 
     @property
     def url(self) -> str:

@@ -1,4 +1,5 @@
 """RAG pipeline service with Jinja2 templates."""
+import asyncio
 import logging
 import os
 import time
@@ -44,6 +45,26 @@ def render_system_prompt(context: str) -> str:
     return template.render(context=context)
 
 
+def reciprocal_rank_fusion(vector_results, bm25_results, k=60, limit=3):
+    scores = {}
+
+    for rank, res in enumerate(vector_results, start=1):
+        doc_id = res['id']
+        scores[doc_id] = scores.get(doc_id, 0) + 1 / (k + rank)
+        scores[doc_id + "_data"] = res
+
+    for rank, res in enumerate(bm25_results, start=1):
+        doc_id = res['id']
+        scores[doc_id] = scores.get(doc_id, 0) + 1 / (k + rank)
+        if doc_id + "_data" not in scores:
+            scores[doc_id + "_data"] = res
+
+    sorted_ids = sorted([key for key in scores if not key.endswith("_data")],
+                        key=lambda x: scores[x], reverse=True)
+
+    return [scores[doc_id + "_data"] for doc_id in sorted_ids[:limit]]
+
+
 async def process_query(query: str, session_id: str | None = None) -> RAGResponse:
     """Process user query through RAG pipeline."""
     start_time = time.perf_counter()
@@ -56,8 +77,11 @@ async def process_query(query: str, session_id: str | None = None) -> RAGRespons
         history = [(m.role, m.content) for m in history_msgs[:-1]]
 
         vector_start = time.perf_counter()
-        query_vector = await embeddings_service.embed_query(query)
-        search_results = await qdrant_service.search(query_vector, limit=3)
+        query_vector = await embeddings_service.embed_text(query)
+        vector_task = qdrant_service.search(query_vector, limit=10) 
+        bm25_task = qdrant_service.search_bm25(query, limit=10)
+        vector_results, bm25_results = await asyncio.gather(vector_task, bm25_task)
+        search_results = reciprocal_rank_fusion(vector_results, bm25_results, limit=3)
         VECTOR_SEARCH_LATENCY.observe(time.perf_counter() - vector_start)
 
         if not search_results:
