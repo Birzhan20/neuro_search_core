@@ -13,6 +13,7 @@ from app.crud import get_messages, get_or_create_session, save_message
 from app.infrastructure.qdrant import qdrant_service
 from app.services.embeddings import embeddings_service
 from app.services.llm import llm_service
+from app.services.reranker import reranker_service
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +79,17 @@ async def process_query(query: str, session_id: str | None = None) -> RAGRespons
 
         vector_start = time.perf_counter()
         query_vector = await embeddings_service.embed_text(query)
-        vector_task = qdrant_service.search(query_vector, limit=10) 
-        bm25_task = qdrant_service.search_bm25(query, limit=10)
+        vector_task = qdrant_service.search(query_vector, limit=25)
+        bm25_task = qdrant_service.search_bm25(query, limit=25)
         vector_results, bm25_results = await asyncio.gather(vector_task, bm25_task)
-        search_results = reciprocal_rank_fusion(vector_results, bm25_results, limit=3)
+        initial_candidates = reciprocal_rank_fusion(vector_results, bm25_results, limit=25)
+        search_results = await asyncio.get_running_loop().run_in_executor(
+            None,
+            reranker_service.rerank,
+            query,
+            initial_candidates,
+            3
+        )
         VECTOR_SEARCH_LATENCY.observe(time.perf_counter() - vector_start)
 
         if not search_results:
@@ -96,9 +104,9 @@ async def process_query(query: str, session_id: str | None = None) -> RAGRespons
         for r in search_results:
             context_parts.append(f"Document: {r['source']} (page {r['page']})\n{r['content']}")
             sources.append(Source(
-                doc_name=os.path.basename(r["source"]),
-                page=r["page"],
-                score=r["score"],
+                doc_name=os.path.basename(r.get("source", "unknown")),
+                page=r.get("page", 0),
+                score=r.get("rerank_score", 0.0),
             ))
 
         context = "\n---\n".join(context_parts)

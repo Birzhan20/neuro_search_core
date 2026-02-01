@@ -12,7 +12,6 @@ from qdrant_client import QdrantClient
 
 from app.core.config import settings
 from app.core.metrics import DOCUMENT_PROCESSED
-from app.infrastructure.qdrant import qdrant_service
 from app.services.embeddings import embeddings_service
 
 logger = logging.getLogger(__name__)
@@ -114,12 +113,15 @@ def upload_to_qdrant(chunks: list[Document]) -> None:
     )
 
     # Use Qdrant VectorStore with explicit client
-    vector_store = Qdrant(
-        client=client,
-        embeddings=embeddings_service.model,
-        collection_name=settings.QDRANT_COLLECTION,
-    )
-    vector_store.add_documents(chunks)
+    try:
+        vector_store = Qdrant(
+            client=client,
+            embeddings=embeddings_service.model,
+            collection_name=settings.QDRANT_COLLECTION,
+        )
+        vector_store.add_documents(chunks)
+    finally:
+        client.close()
 
 
 async def process_document(file_path: str) -> None:
